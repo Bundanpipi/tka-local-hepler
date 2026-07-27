@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>隐名三国 武将数据库</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1e2128;
+    --panel2: #262a33;
+    --border: #343a46;
+    --text: #e8e6e3;
+    --muted: #9aa0ac;
+    --accent: #d4a24e;
+    --bar-bg: #303642;
+    --bar-min: #5b8dd6;
+    --bar-range: #d4a24e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 14px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
+  .table-wrapper { overflow-x: auto; border-radius: 8px; }
+  .table-wrapper::-webkit-scrollbar { height: 8px; }
+  .table-wrapper::-webkit-scrollbar-track { background: var(--panel2); border-radius: 4px; }
+  .table-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .table-wrapper::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  header.site {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header.site .container {
+    display: flex; align-items: baseline; gap: 16px; padding-top: 14px; padding-bottom: 14px;
+  }
+  header.site h1 { font-size: 20px; margin: 0; color: var(--accent); }
+  header.site .sub { color: var(--muted); font-size: 12px; }
+
+  /* 筛选栏 */
+  .filters {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+    margin-bottom: 14px;
+  }
+  .filters .field { display: flex; flex-direction: column; gap: 4px; }
+  .filters label { font-size: 12px; color: var(--muted); }
+  .filters select, .filters input {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 8px; font-size: 14px; min-width: 160px;
+  }
+  .filters button {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 14px; cursor: pointer; font-size: 14px;
+  }
+  .filters button:hover { border-color: var(--accent); color: var(--accent); }
+  .result-count { color: var(--muted); font-size: 12px; margin-left: auto; align-self: center; }
+
+  /* 列表表格 */
+  table.list {
+    width: 100%; border-collapse: collapse;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden;
+  }
+  table.list th, table.list td {
+    padding: 8px 8px; text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.list th { background: var(--panel2); color: var(--muted); font-weight: 600; font-size: 12px; }
+  table.list td.num { text-align: center; font-variant-numeric: tabular-nums; }
+  table.list th.num { text-align: center; }
+  table.list tr.row:hover { background: var(--panel2); }
+  table.list .detail-btn {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; cursor: pointer; font-size: 12px;
+  }
+  table.list .detail-btn:hover { border-color: var(--accent); color: var(--accent); }
+  table.list .name { color: var(--accent); font-weight: 600; cursor: pointer; }
+  .toast {
+    position: fixed;
+    background: #fff; border: 1px solid #ddd; border-radius: 8px;
+    padding: 8px 14px; color: #333; font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000;
+    pointer-events: none;
+    animation: toastIn 0.2s ease-out;
+  }
+  .toast.fade-out { animation: toastOut 0.2s ease-out forwards; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+  table.list .range { color: var(--text); }
+  .empty { text-align: center; color: var(--muted); padding: 32px; }
+
+  /* 详情页 */
+  .detail-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 18px 20px; margin-bottom: 14px;
+  }
+  .detail-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .detail-head h2 { margin: 0; font-size: 26px; color: var(--accent); }
+  .detail-head .alias { color: var(--muted); font-size: 13px; }
+  .meta-line { margin-top: 8px; color: var(--muted); }
+  .meta-line b { color: var(--text); font-weight: 600; }
+  .back { display: inline-block; margin-bottom: 12px; }
+
+  .stats-grid { margin-top: 14px; display: grid; gap: 8px; }
+  .stat-row { display: grid; grid-template-columns: 52px 1fr 90px; gap: 10px; align-items: center; }
+  .stat-label { color: var(--muted); font-size: 13px; }
+  .stat-track { height: 12px; background: var(--bar-bg); border-radius: 6px; position: relative; overflow: hidden; }
+  .stat-fill-min { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bar-min); }
+  .stat-fill-range { position: absolute; top: 0; bottom: 0; background: var(--bar-range); }
+  .stat-val { font-variant-numeric: tabular-nums; text-align: right; color: var(--text); font-size: 13px; }
+
+  .rel-section { margin-top: 6px; }
+  .rel-section h3 { font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 16px;
+    padding: 4px 12px; font-size: 13px;
+  }
+  .chip.none { color: var(--muted); border-style: dashed; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 0 30px; }
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="container">
+    <h1><a href="#/" style="color:inherit">隐名三国 武将数据库</a></h1>
+    <span class="sub" id="site-sub">本地数据 officers.json</span>
+  </div>
+</header>
+<main class="container" id="app">
+  <div class="empty">加载数据中...</div>
+</main>
+<footer>数据来源: officers.json (隐名三国 武将DB 爬取数据)</footer>
+
+<!-- 本地数据: 由 officers.json 生成的 officers.js, 使 file:// 直接打开也能加载 -->
+<script src="officers.js"></script>
+<script>
+"use strict";
+
+const STAT_LABELS = {
+  ldr: "统率", war: "武力", int: "智力", pol: "政治",
+  cha: "魅力", amb: "野心", rig: "义理", rep: "名望",
+};
+const STAT_KEYS = Object.keys(STAT_LABELS);
+const TYPE_KEYS = ["ldr", "war", "int", "pol", "cha"];
+const TYPE_MAP = {
+  ldr: "武将", war: "武人", int: "识士", pol: "文士", cha: "名士",
+};
+const TYPE_LABELS = {
+  ldr: "武将(统率)", war: "武人(武力)", int: "识士(智力)", pol: "文士(政治)", cha: "名士(魅力)",
+};
+
+let officers = [];          // 原始数组
+let byId = new Map();       // id -> officer
+let hometowns = [];         // 去重排序后的故乡列表
+
+// 当前筛选状态
+const filterState = { name: "", hometown: "", liked: "", hated: "", gameYear: "", age: "", type: "" };
+
+/* ---------- 工具 ---------- */
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[c]);
+}
+
+function yearText(v) {
+  if (v == null) return "?";
+  return Array.isArray(v) ? v[0] + "~" + v[1] : String(v);
+}
+
+function lifeText(o) {
+  return yearText(o.birth_year) + " – " + yearText(o.death_year);
+}
+
+function getTier(v) {
+  if (v <= 20) return "最低";
+  if (v <= 40) return "低";
+  if (v <= 60) return "中";
+  if (v <= 80) return "高";
+  return "最高";
+}
+
+function statRangeText(st) {
+  if (!st) return "-";
+  const min = st[0], max = st[1];
+  const minTier = getTier(min);
+  const maxTier = getTier(max);
+  const tierText = minTier === maxTier ? minTier : minTier + "-" + maxTier;
+  return min + "-" + max + " (" + tierText + ")";
+}
+
+function getOfficerTypes(o) {
+  const types = [];
+  const statSummary = TYPE_KEYS.map(k => {
+    const s = o.stats[k];
+    return s ? `${TYPE_LABELS[k].split('(')[0]}=${s[0]}-${s[1]}` : `${TYPE_LABELS[k].split('(')[0]}=null`;
+  }).join(', ');
+  
+  for (const key of TYPE_KEYS) {
+    const stat = o.stats[key];
+    if (!stat) continue;
+    const statMax = stat[1];
+    let canBeHighest = true;
+    const reasons = [];
+    
+    for (const other of TYPE_KEYS) {
+      if (other === key) continue;
+      const otherStat = o.stats[other];
+      if (!otherStat) continue;
+      const otherMin = otherStat[0];
+      if (otherMin > statMax) {
+        canBeHighest = false;
+        reasons.push(`${TYPE_LABELS[other].split('(')[0]}最小值(${otherMin}) > ${TYPE_LABELS[key].split('(')[0]}最大值(${statMax})`);
+        break;
+      } else {
+        reasons.push(`${TYPE_LABELS[other].split('(')[0]}最小值(${otherMin}) <= ${TYPE_LABELS[key].split('(')[0]}最大值(${statMax}) ✓`);
+      }
+    }
+    
+    if (canBeHighest) {
+      types.push(key);
+      console.log(`[类型计算] 武将 ${o.name}(#${o.id}) 能力值: ${statSummary}`);
+      console.log(`[类型计算]   ✓ ${TYPE_LABELS[key].split('(')[0]}(${stat[0]}-${stat[1]}) 可能为最高，判断依据: ${reasons.join('; ')}`);
+    } else {
+      console.log(`[类型计算] 武将 ${o.name}(#${o.id}) 能力值: ${statSummary}`);
+      console.log(`[类型计算]   ✗ ${TYPE_LABELS[key].split('(')[0]}(${stat[0]}-${stat[1]}) 不可能为最高，原因: ${reasons.join('; ')}`);
+    }
+  }
+  
+  const resultTypes = types.map(t => TYPE_MAP[t]).join('/');
+  console.log(`[类型计算] 武将 ${o.name}(#${o.id}) 最终类型: ${resultTypes || '无'} (共${types.length}种)`);
+  return types;
+}
+
+function nameOf(id) {
+  const o = byId.get(id);
+  return o ? o.name : "#" + id;
+}
+
+// 从 "名称 #id" 或纯名称的输入解析出武将 id，解析不到返回 null
+function parseOfficerInput(text) {
+  text = text.trim();
+  if (!text) return null;
+  const m = text.match(/#(\d+)\s*$/);
+  if (m) {
+    const id = Number(m[1]);
+    return byId.has(id) ? id : null;
+  }
+  const found = officers.find(o => o.name === text);
+  return found ? found.id : null;
+}
+
+/* ---------- 筛选 ---------- */
+
+function applyFilters() {
+  const likedId = parseOfficerInput(filterState.liked);
+  const hatedId = parseOfficerInput(filterState.hated);
+  const nameQuery = filterState.name.replace(/#\d+\s*$/, "").trim();
+  
+  const gameYear = filterState.gameYear ? Number(filterState.gameYear) : null;
+  const age = filterState.age ? Number(filterState.age) : null;
+  
+  return officers.filter(o => {
+    if (nameQuery && !o.name.includes(nameQuery)) return false;
+    if (filterState.hometown && o.hometown !== filterState.hometown) return false;
+    if (filterState.liked && (likedId == null || !o.liked.includes(likedId))) return false;
+    if (filterState.hated && (hatedId == null || !o.hated.includes(hatedId))) return false;
+    
+    if (gameYear != null && age != null) {
+      const birthYearMin = Array.isArray(o.birth_year) ? o.birth_year[0] : o.birth_year;
+      const birthYearMax = Array.isArray(o.birth_year) ? o.birth_year[1] : o.birth_year;
+      if (birthYearMin == null) return false;
+      
+      const officerAgeMin = gameYear - birthYearMax;
+      const officerAgeMax = gameYear - birthYearMin;
+      
+      if (age < officerAgeMin || age > officerAgeMax) return false;
+    }
+    
+    return true;
+  });
+}
+
+/* ---------- 列表页 ---------- */
+
+function renderList() {
+  const app = document.getElementById("app");
+  let filtered = applyFilters();
+  
+  if (filterState.type) {
+    console.log(`[排序] 开始按类型 ${TYPE_LABELS[filterState.type]} 排序，待排序武将数: ${filtered.length}`);
+    
+    filtered = [...filtered].sort((a, b) => {
+      const typesA = getOfficerTypes(a);
+      const typesB = getOfficerTypes(b);
+      const hasTypeA = typesA.includes(filterState.type);
+      const hasTypeB = typesB.includes(filterState.type);
+      
+      let result = 0;
+      let reason = "";
+      
+      if (hasTypeA !== hasTypeB) {
+        result = hasTypeA ? -1 : 1;
+        reason = `${a.name}(${typesA.map(t => TYPE_MAP[t]).join('/')})${hasTypeA ? '包含' : '不包含'}目标类型, ${b.name}(${typesB.map(t => TYPE_MAP[t]).join('/')})${hasTypeB ? '包含' : '不包含'}目标类型`;
+      } else if (hasTypeA && hasTypeB) {
+        if (typesA.length !== typesB.length) {
+          result = typesA.length - typesB.length;
+          reason = `${a.name}类型数(${typesA.length}) vs ${b.name}类型数(${typesB.length}), ${result < 0 ? '类型少的排前面' : '类型多的排后面'}`;
+        } else {
+          const statA = a.stats[filterState.type];
+          const statB = b.stats[filterState.type];
+          const avgA = statA ? (statA[0] + statA[1]) / 2 : 0;
+          const avgB = statB ? (statB[0] + statB[1]) / 2 : 0;
+          result = avgB - avgA;
+          reason = `${a.name}${TYPE_LABELS[filterState.type].split('(')[0]}平均值(${avgA.toFixed(1)}) vs ${b.name}平均值(${avgB.toFixed(1)}), ${result < 0 ? '平均值高的排前面' : '平均值低的排后面'}`;
+        }
+      } else {
+        reason = `${a.name}和${b.name}都不包含目标类型，保持原顺序`;
+      }
+      
+      if (result !== 0) {
+        console.log(`[排序] ${reason}，排序结果: ${result < 0 ? a.name + '在前' : b.name + '在前'}`);
+      }
+      
+      return result;
+    });
+    
+    const top5 = filtered.slice(0, 5).map(o => {
+      const types = getOfficerTypes(o);
+      return `${o.name}(#${o.id})[${types.map(t => TYPE_MAP[t]).join('/')}]`;
+    });
+    console.log(`[排序] 排序完成，前5名: ${top5.join(', ')}`);
+  }
+
+  const hometownOpts = ['<option value="">全部</option>']
+    .concat(hometowns.map(h =>
+      `<option value="${esc(h)}"${h === filterState.hometown ? " selected" : ""}>${esc(h)}</option>`))
+    .join("");
+
+  const datalist = officers.map(o =>
+    `<option value="${esc(o.name)} #${o.id}"></option>`).join("");
+
+  const rows = filtered.map(o => {
+    const types = getOfficerTypes(o);
+    const typeText = types.length ? types.map(t => TYPE_MAP[t]).join("/") : "-";
+    const birthYear = yearText(o.birth_year);
+    return `
+    <tr class="row" data-id="${o.id}" data-name="${esc(o.name)}">
+      <td class="name copy-name" data-name="${esc(o.name)}">${esc(o.name)}</td>
+      <td>${typeText}</td>
+      <td>${birthYear}</td>
+      <td>${esc(o.hometown || "-")}</td>
+      ${STAT_KEYS.map(k => `<td class="num range">${statRangeText(o.stats[k])}</td>`).join("")}
+      <td><button class="detail-btn" data-id="${o.id}">详情</button></td>
+    </tr>`;
+  }).join("");
+
+  app.innerHTML = `
+    <div class="filters">
+      <div class="field">
+        <label>故乡</label>
+        <select id="f-hometown">${hometownOpts}</select>
+      </div>
+      <div class="field">
+        <label>武将名称</label>
+        <input id="f-name" list="officer-names" placeholder="输入名称搜索"
+               value="${esc(filterState.name)}">
+      </div>
+      <div class="field">
+        <label>喜欢的武将（列出喜欢 TA 的武将）</label>
+        <input id="f-liked" list="officer-names" placeholder="输入名称, 如 关羽 #1065"
+               value="${esc(filterState.liked)}">
+      </div>
+      <div class="field">
+        <label>厌恶的武将（列出厌恶 TA 的武将）</label>
+        <input id="f-hated" list="officer-names" placeholder="输入名称, 如 曹操 #1743"
+               value="${esc(filterState.hated)}">
+      </div>
+      <button id="f-reset-1">重置</button>
+      <span class="result-count">共 ${filtered.length} / ${officers.length} 名</span>
+      <datalist id="officer-names">${datalist}</datalist>
+    </div>
+    <div class="filters">
+      <div class="field">
+        <label>游戏年份</label>
+        <input id="f-game-year" type="number" placeholder="如 200"
+               value="${esc(filterState.gameYear)}">
+      </div>
+      <div class="field">
+        <label>年龄（岁）</label>
+        <input id="f-age" type="number" placeholder="如 30"
+               value="${esc(filterState.age)}">
+      </div>
+      <div class="field">
+        <label>武将类型</label>
+        <select id="f-type">
+          <option value="">全部</option>
+          ${TYPE_KEYS.map(k => `<option value="${k}"${filterState.type === k ? " selected" : ""}>${TYPE_LABELS[k]}</option>`).join("")}
+        </select>
+      </div>
+      <button id="f-reset-2">重置</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="list">
+        <thead>
+          <tr>
+            <th>名称</th><th>类型</th><th>出生年份</th><th>故乡</th>
+            ${STAT_KEYS.map(k => `<th class="num">${STAT_LABELS[k]}</th>`).join("")}
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>${rows || `<tr><td colspan="13" class="empty">没有符合条件的武将</td></tr>`}</tbody>
+      </table>
+    </div>`;
+
+  document.getElementById("f-hometown").addEventListener("change", e => {
+    filterState.hometown = e.target.value;
+    renderList();
+  });
+  document.getElementById("f-name").addEventListener("change", e => {
+    filterState.name = e.target.value.trim();
+    renderList();
+  });
+  document.getElementById("f-game-year").addEventListener("change", e => {
+    filterState.gameYear = e.target.value.trim();
+    renderList();
+  });
+  document.getElementById("f-type").addEventListener("change", e => {
+    filterState.type = e.target.value;
+    renderList();
+  });
+  document.getElementById("f-age").addEventListener("change", e => {
+    filterState.age = e.target.value.trim();
+    renderList();
+  });
+  document.getElementById("f-liked").addEventListener("change", e => {
+    filterState.liked = e.target.value;
+    renderList();
+  });
+  document.getElementById("f-hated").addEventListener("change", e => {
+    filterState.hated = e.target.value;
+    renderList();
+  });
+  document.getElementById("f-reset-1").addEventListener("click", () => {
+    filterState.name = filterState.hometown = filterState.liked = filterState.hated = "";
+    renderList();
+  });
+  document.getElementById("f-reset-2").addEventListener("click", () => {
+    filterState.gameYear = filterState.type = filterState.age = "";
+    renderList();
+  });
+  function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand("copy");
+    } catch (err) {
+      throw err;
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  }
+  function showToast(msg, x, y) {
+    const existing = document.querySelector(".toast");
+    if (existing) document.body.removeChild(existing);
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    
+    requestAnimationFrame(() => {
+      const rect = toast.getBoundingClientRect();
+      let left = x;
+      let top = y + 20;
+      if (left + rect.width > window.innerWidth) {
+        left = window.innerWidth - rect.width - 10;
+      }
+      if (top + rect.height > window.innerHeight) {
+        top = y - rect.height - 10;
+      }
+      toast.style.left = left + "px";
+      toast.style.top = top + "px";
+    });
+    
+    setTimeout(() => {
+      toast.classList.add("fade-out");
+      setTimeout(() => {
+        if (document.body.contains(toast)) {
+          document.body.removeChild(toast);
+        }
+      }, 200);
+    }, 1500);
+  }
+  
+  app.querySelectorAll(".copy-name").forEach(td => {
+    td.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const name = td.dataset.name;
+      try {
+        await copyToClipboard(name);
+        console.log(`[复制] 已复制武将名称: ${name}`);
+        showToast("已复制武将名称到剪贴板", e.clientX, e.clientY);
+      } catch (err) {
+        console.error("[复制] 复制失败:", err);
+      }
+    });
+  });
+  app.querySelectorAll(".detail-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      const baseUrl = location.href.split("#")[0];
+      window.open(baseUrl + "#/officer/" + id, "_blank");
+    });
+  });
+}
+
+/* ---------- 详情页 ---------- */
+
+function statBar(key, st) {
+  const min = st ? st[0] : 0, max = st ? st[1] : 0;
+  return `
+    <div class="stat-row">
+      <div class="stat-label">${STAT_LABELS[key]}</div>
+      <div class="stat-track">
+        <div class="stat-fill-min" style="width:${min}%"></div>
+        <div class="stat-fill-range" style="left:${min}%; width:${max - min}%"></div>
+      </div>
+      <div class="stat-val">${min} ~ ${max}</div>
+    </div>`;
+}
+
+function chipLinks(ids) {
+  if (!ids || !ids.length) return `<span class="chip none">无</span>`;
+  return ids.map(id =>
+    `<span class="chip"><a href="#/officer/${id}">${esc(nameOf(id))}</a></span>`).join("");
+}
+
+function renderDetail(id) {
+  const app = document.getElementById("app");
+  const o = byId.get(id);
+  if (!o) {
+    app.innerHTML = `<a class="back" href="#/">&larr; 返回列表</a>
+      <div class="empty">未找到 id 为 ${esc(id)} 的武将</div>`;
+    return;
+  }
+  const aliases = ["ko", "en", "ja", "zh-TW"]
+    .map(k => o.names[k]).filter(Boolean).join(" / ");
+
+  app.innerHTML = `
+    <a class="back" href="#/">&larr; 返回列表</a>
+    <div class="detail-card">
+      <div class="detail-head">
+        <h2>${esc(o.name)}</h2>
+        <span class="alias">${esc(aliases)}</span>
+        <span class="alias">ID: ${o.id}</span>
+      </div>
+      <div class="meta-line">
+        出生: <b>${yearText(o.birth_year)}</b> &nbsp;|&nbsp;
+        死亡: <b>${yearText(o.death_year)}</b> &nbsp;|&nbsp;
+        故乡: <b>${esc(o.hometown || "-")}</b>
+        <span style="color:var(--muted)">(区域 ${esc(o.hometown_id)})</span>
+      </div>
+      <div class="stats-grid">
+        ${STAT_KEYS.map(k => statBar(k, o.stats[k])).join("")}
+      </div>
+      <div class="rel-section">
+        <h3>喜欢的武将 (${o.liked.length})</h3>
+        <div class="chips">${chipLinks(o.liked)}</div>
+        <h3>厌恶的武将 (${o.hated.length})</h3>
+        <div class="chips">${chipLinks(o.hated)}</div>
+      </div>
+    </div>`;
+  window.scrollTo(0, 0);
+}
+
+/* ---------- 路由 ---------- */
+
+function route() {
+  const hash = location.hash || "#/";
+  const m = hash.match(/^#\/officer\/(\d+)$/);
+  if (m) renderDetail(Number(m[1]));
+  else renderList();
+}
+
+/* ---------- 启动 ---------- */
+
+function init(data) {
+  officers = data;
+  byId = new Map(officers.map(o => [o.id, o]));
+  hometowns = [...new Set(officers.map(o => o.hometown).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "zh"));
+  document.getElementById("site-sub").textContent =
+    "共 " + officers.length + " 名武将 · 数据来自 officers.json";
+  window.addEventListener("hashchange", route);
+  route();
+}
+
+if (Array.isArray(window.OFFICERS_DATA)) {
+  // 优先使用 officers.js 中的本地数据 (file:// 直接打开可用)
+  init(window.OFFICERS_DATA);
+} else {
+  // 回退: 通过 HTTP 读取 officers.json (需本地服务器)
+  fetch("officers.json")
+    .then(r => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(init)
+    .catch(err => {
+      document.getElementById("app").innerHTML =
+        `<div class="empty">加载数据失败: ${esc(err.message)}<br><br>
+         未找到 officers.js。请先由 officers.json 生成 officers.js:<br>
+         <code>python3 -c "import json; f=open('officers.js','w'); f.write('window.OFFICERS_DATA = '+open('officers.json').read()+';')"</code><br>
+         然后刷新本页面即可。</div>`;
+    });
+}
+</script>
+</body>
+</html>
